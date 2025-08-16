@@ -3,6 +3,7 @@ import torch.nn as nn
 from einops import rearrange
 from typing import Tuple, Optional
 
+
 class SiglipVisionModelConfig:
 
     def __init__(
@@ -86,6 +87,8 @@ class SiglipVisionEmbedding(nn.Module):
 
         return embeddings
     
+
+
 class SiglipMLP(nn.Module):
 
     def __init__(self, config: SiglipVisionModelConfig):
@@ -107,6 +110,7 @@ class SiglipMLP(nn.Module):
         hidden_states = self.fc2(hidden_states)
 
         return hidden_states # [Batch_size, num_patches, embedding_dim]
+
 
 
 class SiglipAttention(nn.Module):
@@ -171,6 +175,7 @@ class SiglipAttention(nn.Module):
         return attention_output, attention_weights 
  
 
+
 class SiglipVisionEncoderLayer(nn.Module):
 
     def __init__(self, config: SiglipVisionModelConfig):
@@ -209,6 +214,7 @@ class SiglipVisionEncoderLayer(nn.Module):
         hidden_states = residual + hidden_states
 
         return hidden_states 
+
 
 
 class SiglipVisionEncoder(nn.Module):
@@ -256,6 +262,7 @@ class SiglipVisionTransformer(nn.Module):
         last_hidden_state = self.post_layernorm(last_hidden_state)
 
         return last_hidden_state
+
 
 
 class SiglipVisionModel(nn.Module):
