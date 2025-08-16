@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from einops import rearrange
+from typing import Tuple, Optional
 
 class SiglipVisionModelConfig:
 
@@ -113,24 +114,61 @@ class SiglipAttention(nn.Module):
     def __init__(self, config:SiglipVisionModelConfig):
         super(SiglipAttention, self).__init__()
 
+        self.config = config
+
         self.embedding_dim = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
         self.patch_size = config.patch_size
-        self.attention_dropout = config.attention_dropout
+        self.dropout = config.attention_dropout
 
+        self.head_dim = self.embedding_dim // self.num_attention_heads
 
-    def forward(self, hidden_states:torch.Tensor) -> torch.Tensor:
+        self.k_proj = nn.Linear(self.embedding_dim, self.embedding_dim)
+        self.q_proj = nn.Linear(self.embedding_dim, self.embedding_dim) 
+        self.v_proj = nn.Linear(self.embedding_dim, self.embedding_dim)
+        self.out_proj = nn.Linear(self.embedding_dim, self.embedding_dim)
+
+    def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
 
         """
         Input: [Batch_size, num_patches, embedding_dim]
         Output: [Batch_size, num_patches, embedding_dim]
         """
-	
-	
-        pass
+    
+        batch_size, seq_len, d_model = hidden_states.shape # d_model is same as embedding_dim
 
+        K = self.k_proj(hidden_states)  # [Batch_size, seq_len, embedding_dim]
+        Q = self.q_proj(hidden_states)  # [Batch_size, seq_len, embedding_dim]  
+        V = self.v_proj(hidden_states)  # [Batch_size, seq_len, embedding_dim]
 
+        # Traditional Way to rearrange would be:
+        # K = K.reshape(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)
+        K = rearrange(K, 'b s (h d) -> (b h s d)', h=self.num_attention_heads, d=self.head_dim)  # [Batch_size, num_heads, seq_len, head_dim]
+        Q = rearrange(Q, 'b s (h d) -> (b h s d)', h=self.num_attention_heads, d=self.head_dim)  # [Batch_size, num_heads, seq_len, head_dim]
+        V = rearrange(V, 'b s (h d) -> (b h s d)', h=self.num_attention_heads, d=self.head_dim)  # [Batch_size, num_heads, seq_len, head_dim]
 
+        attention_output = self.MultiHeadAttention(K, Q, V) # [Batch_size, num_heads, seq_len, head_dim]
+
+        # [Batch_size, num_heads, seq_len, head_dim] -> [Batch_size, seq_len, embedding_dim]
+        # Traditional Way to rearrange would be:
+        # attention_output = attention_output.transpose(1, 2).reshape(batch_size, seq_len, self.embedding_dim)
+        attention_output = rearrange(attention_output, 'b h s d -> b s (h d)', h=self.num_attention_heads, d=self.head_dim)  
+        attention_output = self.out_proj(attention_output)
+
+        return attention_output
+    
+    def MultiHeadAttention(self, K, Q, V):
+        """
+        Input: K, Q, V of shape [Batch_size, num_heads, seq_len, head_dim]
+        Output: Attention output of shape [Batch_size, num_heads, seq_len, head_dim]
+        """
+
+        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / (self.head_dim ** 0.5)  # [Batch_size, num_heads, seq_len, seq_len]
+        attention_weights = nn.functional.softmax(attention_scores, dim=-1).to(Q.dtype)  # [Batch_size, num_heads, seq_len, seq_len]
+        attention_weights = nn.functional.dropout(attention_weights, p=self.dropout, training=self.training)
+        attention_output = torch.matmul(attention_weights, V) # [Batch_size, num_heads, seq_len, head_dim]
+
+        return attention_output, attention_weights 
  
 
 class SiglipVisionEncoderLayer(nn.Module):
