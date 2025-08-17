@@ -58,6 +58,7 @@ class PaliGemmaProcessor:
         # Convert into a single batched torch tensor from a list of numpy images
         pixel_values = torch.tensor(np.stack(pixel_values, axis=0))
 
-    def process_images():
+    def process_images(images):
 
         pass
+        
