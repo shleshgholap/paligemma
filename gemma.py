@@ -1,4 +1,4 @@
-import tprch
+import torch
 import torch.nn as nn
 from typing import List, Optional, Union, Iterable, Tuple
 from torch.nn import CrossEntropyLoss
@@ -23,3 +23,20 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
     def tie_weights(self):
         return self.language_model.tie_weights()
+
+    def forward(
+            self,
+            input_ids: torch.LongTensor = None,
+            pixel_values: torch.FloatTensor = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            kc_cache: Optional[KVCache] = None,
+    ) -> Tuple:
+        
+        assert torch.all(attention_mask == 1), "The input cannot be padded for now"
+
+        # 1. Extra the input embeddings
+        # shape: (Batch_size, seq_len, hidden_size)
+        input_embeddings = self.language_model.get_input_embeddings()(input_ids)
+        
+
+        pass
